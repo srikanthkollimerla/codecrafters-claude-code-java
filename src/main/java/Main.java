@@ -2,7 +2,8 @@ import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
-import com.openai.models.chat.completions.ChatCompletionCreateParams.Tool;
+// The explicit correct import provided by the compiler hint
+import com.openai.models.chat.completions.ChatCompletionTool;
 import com.openai.core.JsonValue;
 import java.util.Map;
 import java.util.List;
@@ -26,7 +27,7 @@ public class Main {
             throw new RuntimeException("OPENROUTER_API_KEY is not set");
         }
 
-        // 1. Map out the parameter schema using raw maps for ultimate safety
+        // 1. Setup the parameters payload using a standard map
         Map<String, Object> innerProperties = Map.of(
             "file_path", Map.of(
                 "type", "string",
@@ -40,10 +41,10 @@ public class Main {
             "required", List.of("file_path")
         );
 
-        // 2. Build the tool using ChatCompletionCreateParams' own inner Tool builder
-        Tool readTool = Tool.builder()
-                .type(Tool.Type.FUNCTION)
-                .function(Tool.Function.builder()
+        // 2. Build the tool using ChatCompletionTool.builder() exactly as requested
+        ChatCompletionTool readTool = ChatCompletionTool.builder()
+                .type(ChatCompletionTool.Type.FUNCTION)
+                .function(ChatCompletionTool.Function.builder()
                         .name("Read")
                         .description("Read and return the contents of a file")
                         .parameters(JsonValue.from(parametersMap))
@@ -55,14 +56,14 @@ public class Main {
                 .baseUrl(baseUrl)
                 .build();
 
-        // 3. Complete the request by adding the tool
-        ChatCompletion response = client.chat().completions().create(
-                ChatCompletionCreateParams.builder()
-                        .model("anthropic/claude-haiku-4.5")
-                        .addUserMessage(prompt)
-                        .addTool(readTool)
-                        .build()
-        );
+        // 3. Construct the completion parameters and add the tool
+        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
+                .model("anthropic/claude-haiku-4.5")
+                .addUserMessage(prompt)
+                .addTool(readTool)
+                .build();
+
+        ChatCompletion response = client.chat().completions().create(params);
 
         if (response.choices().isEmpty()) {
             throw new RuntimeException("no choices in response");
