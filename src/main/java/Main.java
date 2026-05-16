@@ -45,6 +45,11 @@ public class Main {
         ))
         .build();
 
+        ChatCompletionTool readToolDefinition = ChatCompletionTool.builder()
+        .type(ChatCompletionTool.Type.FUNCTION)
+        .function(readTool)
+        .build();
+
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
@@ -54,7 +59,7 @@ public class Main {
                 ChatCompletionCreateParams.builder()
                         .model("anthropic/claude-haiku-4.5")
                         .addUserMessage(prompt)
-                        .tools(List.of(readTool))
+                        .tools(List.of(readToolDefinition))
                         .build()
         );
 
