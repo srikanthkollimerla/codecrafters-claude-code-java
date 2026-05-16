@@ -2,13 +2,8 @@ import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
-// --- ALL CRITICAL TOOL IMPORTS FIXED HERE ---
+import com.openai.models.chat.completions.ChatCompletionCreateParams.Tool;
 import com.openai.core.JsonValue;
-import com.openai.models.FunctionDefinition;
-import com.openai.models.FunctionParameters;
-import com.openai.models.chat.completions.ChatCompletionTool;
-import com.openai.models.chat.completions.ChatCompletionFunctionTool;
-// --------------------------------------------
 import java.util.Map;
 import java.util.List;
 
@@ -31,35 +26,36 @@ public class Main {
             throw new RuntimeException("OPENROUTER_API_KEY is not set");
         }
 
-        // 1. Build the schema parameters using FunctionParameters and JsonValue cleanly
-        FunctionParameters parametersSchema = FunctionParameters.builder()
-                .putAdditionalProperty("type", JsonValue.from("object"))
-                .putAdditionalProperty("properties", JsonValue.from(Map.of(
-                        "file_path", Map.of(
-                                "type", "string",
-                                "description", "The path to the file to read"
-                        )
-                )))
-                .putAdditionalProperty("required", JsonValue.from(List.of("file_path")))
-                .build();
-
-        // 2. Build the tool definition matching the SDK's nested expectations
-        ChatCompletionTool readTool = ChatCompletionTool.ofFunction(
-                ChatCompletionFunctionTool.builder()
-                        .function(FunctionDefinition.builder()
-                                .name("Read")
-                                .description("Read and return the contents of a file")
-                                .parameters(parametersSchema)
-                                .build())
-                        .build()
+        // 1. Map out the parameter schema using raw maps for ultimate safety
+        Map<String, Object> innerProperties = Map.of(
+            "file_path", Map.of(
+                "type", "string",
+                "description", "The path to the file to read"
+            )
         );
+
+        Map<String, Object> parametersMap = Map.of(
+            "type", "object",
+            "properties", innerProperties,
+            "required", List.of("file_path")
+        );
+
+        // 2. Build the tool using ChatCompletionCreateParams' own inner Tool builder
+        Tool readTool = Tool.builder()
+                .type(Tool.Type.FUNCTION)
+                .function(Tool.Function.builder()
+                        .name("Read")
+                        .description("Read and return the contents of a file")
+                        .parameters(JsonValue.from(parametersMap))
+                        .build())
+                .build();
 
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .build();
 
-        // 3. Attach the tool right to your parameter request payload
+        // 3. Complete the request by adding the tool
         ChatCompletion response = client.chat().completions().create(
                 ChatCompletionCreateParams.builder()
                         .model("anthropic/claude-haiku-4.5")
