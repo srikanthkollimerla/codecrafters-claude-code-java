@@ -3,6 +3,9 @@ import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.FunctionDefinition;
+import com.openai.models.chat.completions.ChatCompletionTool;
+import com.openai.models.chat.completions.FunctionParameters;
+import com.openai.json.JsonValue;
 import java.util.Map;
 import java.util.List;
 
@@ -28,24 +31,19 @@ public class Main {
 
         //creating a FunctionDefinition for the read tool
         FunctionDefinition readTool = FunctionDefinition.builder()
-                .name("Read")
-                .description("Read and return the contents of a file")
-                    .parameters(FunctionParameters.builder()
-                            .putAdditionalProperty("type", JsonValue.from("object"))
-                            .putAdditionalProperty("properties", JsonValue.from(Map.of(
-                                    "file_path", Map.of(
-                                            "type", "string",
-                                            "description", "The path to the file to read"
-                                    )
-                            )))
-                            .putAdditionalProperty("required", JsonValue.from(List.of("file_path")))
-                            .build())
-                .build();
-
-        ChatCompletionTool readTool = ChatCompletionTool.builder()
-                .type(ChatCompletionTool.Type.FUNCTION)
-                .function(readTool)
-                .build();
+        .name("Read")
+        .description("Read and return the contents of a file")
+        .parameters(Map.of(
+            "type", "object",
+            "properties", Map.of(
+                "file_path", Map.of(
+                    "type", "string",
+                    "description", "The path to the file to read"
+                )
+            ),
+            "required", List.of("file_path")
+        ))
+        .build();
 
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(apiKey)
