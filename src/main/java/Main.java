@@ -2,6 +2,8 @@ import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import java.util.Map;
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
@@ -22,25 +24,26 @@ public class Main {
             throw new RuntimeException("OPENROUTER_API_KEY is not set");
         }
 
-        JsonValue parametersSchema = JsonValue.from(Map.of(
-            "type", "object",
-            "properties", Map.of(
-                "file_path", Map.of(
-                    "type", "string",
-                    "description", "The path to the file to read"
-                )
-            ),
-            "required", List.of("file_path")
-        ));
+        // 1. Build the schema parameters using FunctionParameters and JsonValue
+        FunctionParameters parametersSchema = FunctionParameters.builder()
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                        "file_path", Map.of(
+                                "type", "string",
+                                "description", "The path to the file to read"
+                        )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("file_path")))
+                .build();
 
-        ChatCompletionTool readTool = ChatCompletionTool.builder()
-        .type(ChatCompletionTool.Type.FUNCTION)
-        .function(FunctionDefinition.builder()
-                .name("Read")
-                .description("Read and return the contents of a file")
-                .parameters(parametersSchema)
-                .build())
-        .build();
+        // 2. Wrap it inside the ChatCompletionFunctionTool definition
+        ChatCompletionFunctionTool readTool = ChatCompletionFunctionTool.builder()
+                .function(FunctionDefinition.builder()
+                        .name("Read")
+                        .description("Read and return the contents of a file")
+                        .parameters(parametersSchema)
+                        .build())
+                .build();
 
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(apiKey)
