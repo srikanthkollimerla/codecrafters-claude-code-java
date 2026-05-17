@@ -21,6 +21,11 @@
             <artifactId>openai-java</artifactId>
             <version>0.36.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20240303</version>
+        </dependency>
     </dependencies>
 
     <build>

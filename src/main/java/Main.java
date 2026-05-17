@@ -5,6 +5,9 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.chat.completions.ChatCompletionTool;
 import com.openai.core.JsonValue;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.util.Map;
 import java.util.List;
 
@@ -67,6 +70,19 @@ public class Main {
 
         // You can use print statements as follows for debugging, they'll be visible when running tests.
         System.err.println("Logs from your program will appear here!");
+       JSONObject resoObject = new JSONObject(response);
+       JSONObject choiceObject = resoObject.getJSONArray("choices").getJSONObject(0);
+       JSONArray toolCallsObject = messageObject.getJSONArray("tool_calls");
+       for (int i = 0; i < toolCallsObject.length(); i++) {
+            JSONObject toolCallObject = toolCallsObject.getJSONObject(i);
+            JSONObject functionObject = toolCallObject.getJSONObject("function");
+            String filePath = functionObject.getString("file_path");
+            //System.out.println("File path: " + filePath);
+       }
+       //use your language's file system library to read the file at the requested file_path.
+       String fileContent = Files.readString(Path.of(filePath));
+       System.out.println("File content: " + fileContent);
+
 
         // TODO: Uncomment the line below to pass the first stage
         System.out.print(response.choices().get(0).message().content().orElse(""));
