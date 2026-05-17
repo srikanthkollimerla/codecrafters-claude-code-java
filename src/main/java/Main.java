@@ -6,9 +6,14 @@ import com.openai.models.FunctionDefinition;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
 import com.openai.models.chat.completions.ChatCompletionTool;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
+import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
+import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
+import com.openai.models.chat.completions.ChatCompletionToolMessageParam;
 import com.openai.core.JsonValue;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,37 +65,66 @@ public class Main {
                 .baseUrl(baseUrl)
                 .build();
 
-        ChatCompletion response = client.chat().completions().create(
-                ChatCompletionCreateParams.builder()
-                        .model("anthropic/claude-haiku-4.5")
-                        .addUserMessage(prompt)
-                        .tools(List.of(readToolDefinition))
-                        .build()
-        );
+        List<ChatCompletionMessageParam> messages = new ArrayList<>();
+        messages.add(ChatCompletionMessageParam.ofUser(
+                ChatCompletionUserMessageParam.builder().content(prompt).build()
+        ));
 
-        if (response.choices().isEmpty()) {
-            throw new RuntimeException("no choices in response");
-        }
+        while(true) {
+            ChatCompletion response = client.chat().completions().create(
+                    ChatCompletionCreateParams.builder()
+                            .model("anthropic/claude-haiku-4.5")
+                            .messages(messages)
+                            .tools(List.of(readToolDefinition))
+                            .build()
+            );
 
-        // You can use print statements as follows for debugging, they'll be visible when running tests.
-        System.err.println("Logs from your program will appear here!");
+            if (response.choices().isEmpty()) {
+                throw new RuntimeException("no choices in response");
+            }
 
-        ChatCompletionMessage message = response.choices().get(0).message();
+            // You can use print statements as follows for debugging, they'll be visible when running tests.
+            System.err.println("Logs from your program will appear here!");
 
-        if (message.toolCalls().isPresent() && !message.toolCalls().get().isEmpty()) {
-            ChatCompletionMessageToolCall toolCall = message.toolCalls().get().get(0);
-            
-            String argumentsString = toolCall.function().arguments();
-            JSONObject argsObj = new JSONObject(argumentsString);
-            String filePath = argsObj.getString("file_path");
-            
-            try {
-                String fileContent = Files.readString(Path.of(filePath));
-                System.out.print(fileContent);
-            } catch (Exception e) {}
-        } else {
-            // TODO: Uncomment the line below to pass the first stage
-            System.out.print(response.choices().get(0).message().content().orElse(""));
+            ChatCompletionMessage message = response.choices().get(0).message();
+
+            // 1. Record the assistant's response to the chat history
+            ChatCompletionAssistantMessageParam.Builder assistantBuilder = ChatCompletionAssistantMessageParam.builder();
+            if (message.content().isPresent()) {
+                assistantBuilder.content(message.content().get());
+            }
+            if (message.toolCalls().isPresent() && !message.toolCalls().get().isEmpty()) {
+                assistantBuilder.toolCalls(message.toolCalls().get());
+            }
+            messages.add(ChatCompletionMessageParam.ofAssistant(assistantBuilder.build()));
+
+            if (message.toolCalls().isPresent() && !message.toolCalls().get().isEmpty()) {
+                // 2. Execute each requested tool
+                for (ChatCompletionMessageToolCall toolCall : message.toolCalls().get()) {
+                    String argumentsString = toolCall.function().arguments();
+                    JSONObject argsObj = new JSONObject(argumentsString);
+                    String filePath = argsObj.getString("file_path");
+                    
+                    String fileContent;
+                    try {
+                        fileContent = Files.readString(Path.of(filePath));
+                    } catch (Exception e) {
+                        fileContent = "Error: " + e.getMessage();
+                    }
+                    
+                    // 3. Add each tool call result back to the messages array
+                    messages.add(ChatCompletionMessageParam.ofTool(
+                            ChatCompletionToolMessageParam.builder()
+                                    .toolCallId(toolCall.id())
+                                    .content(fileContent)
+                                    .build()
+                    ));
+                }
+            } else {
+                // 4. Repeat until complete (no tool calls present)
+                System.out.print(message.content().orElse(""));
+                break;
+            }
         }
     }
 }
