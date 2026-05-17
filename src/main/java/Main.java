@@ -3,6 +3,8 @@ import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.FunctionDefinition;
+import com.openai.models.chat.completions.ChatCompletionMessage;
+import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
 import com.openai.models.chat.completions.ChatCompletionTool;
 import com.openai.core.JsonValue;
 import java.nio.file.Files;
@@ -72,23 +74,22 @@ public class Main {
 
         // You can use print statements as follows for debugging, they'll be visible when running tests.
         System.err.println("Logs from your program will appear here!");
-       JSONObject resoObject = new JSONObject(response);
-       JSONObject messageObject = resoObject.getJSONArray("choices").getJSONObject(0);
-       JSONArray toolCallsObject = messageObject.getJSONArray("tool_calls");
-       if(toolCallsObject.length() > 0) {
-            JSONObject toolCallObject = toolCallsObject.getJSONObject(0);
-            JSONObject functionObject = toolCallObject.getJSONObject("function");
-            JSONObject arJsonObject = functionObject.getJSONObject("arguments");
-            String filePath = arJsonObject.getString("file_path");
-            //System.out.println("File path: " + filePath);
-            //use your language's file system library to read the file at the requested file_path.
+
+        ChatCompletionMessage message = response.choices().get(0).message();
+
+        if (message.toolCalls().isPresent() && !message.toolCalls().get().isEmpty()) {
+            ChatCompletionMessageToolCall toolCall = message.toolCalls().get().get(0);
+            
+            String argumentsString = toolCall.function().arguments();
+            JSONObject argsObj = new JSONObject(argumentsString);
+            String filePath = argsObj.getString("file_path");
+            
             try {
-                String fileContent =  Files.readString(Path.of(filePath));
+                String fileContent = Files.readString(Path.of(filePath));
                 System.out.print(fileContent);
             } catch (Exception e) {}
-       }
-       else {
-        // TODO: Uncomment the line below to pass the first stage
+        } else {
+            // TODO: Uncomment the line below to pass the first stage
             System.out.print(response.choices().get(0).message().content().orElse(""));
         }
     }
