@@ -56,8 +56,33 @@ public class Main {
         )))
         .build();
 
+        //creating a functiondefinition for the write tool
+        FunctionDefinition writeTool = FunctionDefinition.builder()
+        .name("Write")
+        .description("Write to a file")
+        .parameters(JsonValue.from(Map.of(
+            "type", "object",
+            "properties", Map.of(
+                "file_path", Map.of(
+                    "type", "string",
+                    "description", "The path to the file to write to"
+                ),
+                "content", Map.of(
+                    "type", "string",
+                    "description", "The content to write to the file"
+                )
+            ),
+            "required", List.of("file_path", "content")
+        )))
+        .build();
+
+        //pass readTool and writeTool to ChatCompletionTool builder
         ChatCompletionTool readToolDefinition = ChatCompletionTool.builder()
         .function(readTool)
+        .build();
+
+        ChatCompletionTool writeToolDefinition = ChatCompletionTool.builder()
+        .function(writeTool)
         .build();
 
         OpenAIClient client = OpenAIOkHttpClient.builder()
@@ -75,7 +100,7 @@ public class Main {
                     ChatCompletionCreateParams.builder()
                             .model("anthropic/claude-haiku-4.5")
                             .messages(messages)
-                            .tools(List.of(readToolDefinition))
+                            .tools(List.of(readToolDefinition, writeToolDefinition))
                             .build()
             );
 
@@ -101,22 +126,32 @@ public class Main {
             if (message.toolCalls().isPresent() && !message.toolCalls().get().isEmpty()) {
                 // 2. Execute each requested tool
                 for (ChatCompletionMessageToolCall toolCall : message.toolCalls().get()) {
+                    String toolName = toolCall.function().name();
                     String argumentsString = toolCall.function().arguments();
                     JSONObject argsObj = new JSONObject(argumentsString);
-                    String filePath = argsObj.getString("file_path");
                     
-                    String fileContent;
+                    String toolResult;
                     try {
-                        fileContent = Files.readString(Path.of(filePath));
+                        if ("Read".equals(toolName)) {
+                            String filePath = argsObj.getString("file_path");
+                            toolResult = Files.readString(Path.of(filePath));
+                        } else if ("Write".equals(toolName)) {
+                            String filePath = argsObj.getString("file_path");
+                            String content = argsObj.getString("content");
+                            Files.writeString(Path.of(filePath), content);
+                            toolResult = "File successfully written.";
+                        } else {
+                            toolResult = "Error: Unknown tool " + toolName;
+                        }
                     } catch (Exception e) {
-                        fileContent = "Error: " + e.getMessage();
+                        toolResult = "Error: " + e.getMessage();
                     }
                     
                     // 3. Add each tool call result back to the messages array
                     messages.add(ChatCompletionMessageParam.ofTool(
                             ChatCompletionToolMessageParam.builder()
                                     .toolCallId(toolCall.id())
-                                    .content(fileContent)
+                                    .content(toolResult)
                                     .build()
                     ));
                 }
