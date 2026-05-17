@@ -76,17 +76,20 @@ public class Main {
        JSONObject messageObject = resoObject.getJSONArray("choices").getJSONObject(0);
        JSONArray toolCallsObject = messageObject.getJSONArray("tool_calls");
        if(toolCallsObject.length() > 0) {
-        JSONObject toolCallObject = toolCallsObject.getJSONObject(0);
-        JSONObject functionObject = toolCallObject.getJSONObject("function");
-        String filePath = functionObject.getString("file_path");
-        //System.out.println("File path: " + filePath);
-        //use your language's file system library to read the file at the requested file_path.
-        String fileContent = Files.readString(Path.of(filePath));
-        System.out.println("File content: " + fileContent);
+            JSONObject toolCallObject = toolCallsObject.getJSONObject(0);
+            JSONObject functionObject = toolCallObject.getJSONObject("function");
+            JSONObject arJsonObject = functionObject.getJSONObject("arguments");
+            String filePath = arJsonObject.getString("file_path");
+            //System.out.println("File path: " + filePath);
+            //use your language's file system library to read the file at the requested file_path.
+            try {
+                String fileContent =  Files.readString(Path.of(filePath));
+                System.out.print(fileContent);
+            } catch (Exception e) {}
        }
-
-
+       else {
         // TODO: Uncomment the line below to pass the first stage
-        System.out.print(response.choices().get(0).message().content().orElse(""));
+            System.out.print(response.choices().get(0).message().content().orElse(""));
+        }
     }
 }
