@@ -76,13 +76,33 @@ public class Main {
         )))
         .build();
 
-        //pass readTool and writeTool to ChatCompletionTool builder
+        //creating a functiondefinition for the bash tool
+        FunctionDefinition bashTool = FunctionDefinition.builder()
+        .name("Bash")
+        .description("Execute a shell command")
+        .parameters(JsonValue.from(Map.of(
+            "type", "object",
+            "properties", Map.of(
+                "command", Map.of(
+                    "type", "string",
+                    "description", "The command to execute"
+                )
+            ),
+            "required", List.of("command")
+        )))
+        .build();
+
+        //pass readTool, bashTool, and  writeTool to ChatCompletionTool builder
         ChatCompletionTool readToolDefinition = ChatCompletionTool.builder()
         .function(readTool)
         .build();
 
         ChatCompletionTool writeToolDefinition = ChatCompletionTool.builder()
         .function(writeTool)
+        .build();
+
+        ChatCompletionTool bashToolDefinition = ChatCompletionTool.builder()
+        .function(bashTool)
         .build();
 
         OpenAIClient client = OpenAIOkHttpClient.builder()
@@ -100,7 +120,7 @@ public class Main {
                     ChatCompletionCreateParams.builder()
                             .model("anthropic/claude-haiku-4.5")
                             .messages(messages)
-                            .tools(List.of(readToolDefinition, writeToolDefinition))
+                            .tools(List.of(readToolDefinition, writeToolDefinition, bashToolDefinition))
                             .build()
             );
 
@@ -140,6 +160,13 @@ public class Main {
                             String content = argsObj.getString("content");
                             Files.writeString(Path.of(filePath), content);
                             toolResult = "File successfully written.";
+                        } else if("Bash".equals(toolName)) {
+                            String command = argsObj.getString("command");
+                            ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
+                            processBuilder.redirectErrorStream(true); // Merges standard error into standard output
+                            Process process = processBuilder.start();
+                            toolResult = new String(process.getInputStream().readAllBytes());
+                            process.waitFor();
                         } else {
                             toolResult = "Error: Unknown tool " + toolName;
                         }
